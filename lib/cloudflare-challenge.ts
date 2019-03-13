@@ -1,9 +1,9 @@
-import crypto from 'crypto';
-import Cloudflare from 'cloudflare';
-import util from 'util';
-import consumePages from './consume-pages';
-import delay from './delay';
-import resolveTxt from './resolve-txt';
+import * as crypto from 'crypto';
+import * as Cloudflare from 'cloudflare';
+import * as util from 'util';
+import {consumePages} from './consume-pages';
+import {delay} from './delay';
+import{resolveTxt} from './resolve-txt';
 
 const debug = util.debuglog('le-challenge-cloudflare');
 
@@ -41,7 +41,11 @@ const debug = util.debuglog('le-challenge-cloudflare');
  * Cloudflare API and optionally verifies the propagation via a DNS lookup
  * or using the Google Public DNS API (DNS-Over-HTTPS).
  */
-export default class CloudflareChallenge {
+export class CloudflareChallenge {
+  private cloudflare: any;
+  private acmePrefix: string;
+  private useDNSOverHTTPS: any;
+  private verifyPropagation: any;
   // /**
   //  * The Cloudflare API client.
   //  * @type {Object}
@@ -98,6 +102,7 @@ export default class CloudflareChallenge {
         ? cloudflare
         : new Cloudflare(cloudflare);
     this.acmePrefix = acmePrefix;
+    // @ts-ignore
     this.verifyPropagation = verifyPropagation;
     this.useDNSOverHTTPS = useDNSOverHTTPS;
   }
@@ -214,14 +219,14 @@ export default class CloudflareChallenge {
 
   // eslint-disable-next-line class-methods-use-this
   async loopback(...args) {
-    return CloudflareChallenge.loopback(...args);
+    return this.loopback(...args);
   }
 
   static async loopback(
     { acmePrefix, useDNSOverHTTPS, authContent },
     domain,
     challenge,
-    done
+    done?
   ) {
     try {
       const fqdn = CloudflareChallenge.getFQDN(domain, acmePrefix);
@@ -251,13 +256,13 @@ export default class CloudflareChallenge {
     { verifyPropagation, ...options },
     domain,
     challenge,
-    waitFor = verifyPropagation.waitFor,
-    retries = verifyPropagation.retries
+    waitFor = 2000,
+    retries = 90
   ) {
     debug(`Awaiting propagation of TXT record for '${domain}'.`);
     for (let i = 0; i <= retries; i++) {
       try {
-        await CloudflareChallenge.loopback(options, domain, challenge);
+        await this.loopback(options as any, domain, challenge);
         debug(`Successfully propagated challenge for '${domain}'.`);
         return;
       } catch (error) {
@@ -300,7 +305,7 @@ export default class CloudflareChallenge {
 
   async getTxtRecords(zone, name) {
     const records = [];
-
+    
     for await (const txtRecord of consumePages(pagination =>
       this.cloudflare.dnsRecords.browse(zone.id, {
         ...pagination,
